@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  TENANT
+  OWNER
+  ADMIN
+}
+
+enum RoomType {
+  SINGLE
+  SHARED
+  ENTIRE_FLAT
+}
+
+enum FurnishingType {
+  FULLY_FURNISHED
+  SEMI_FURNISHED
+  UNFURNISHED
+}
+
+enum ListingStatus {
+  AVAILABLE
+  FILLED
+  UNAVAILABLE
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  name                String
+  email               String               @unique
+  passwordHash        String
+  role                Role                 @default(TENANT)
+  isActive            Boolean              @default(true)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  tenantProfile       TenantProfile?
+  listings            Listing[]
+  compatibilityScores CompatibilityScore[]
+  interests           Interest[]
+  sentMessages        Message[]
+
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+model TenantProfile {
+  id                  String          @id @default(uuid())
+  userId              String          @unique
+  preferredLocation   String?
+  budgetMin           Decimal?        @db.Decimal(10, 2)
+  budgetMax           Decimal?        @db.Decimal(10, 2)
+  moveInDate          DateTime?
+  preferredRoomType   RoomType?
+  preferredFurnishing FurnishingType?
+  lifestyle           Json?
+  notes               String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([preferredLocation])
+  @@map("tenant_profiles")
+}
+
+model Listing {
+  id            String         @id @default(uuid())
+  ownerId       String
+  title         String
+  description   String
+  location      String
+  rent          Decimal        @db.Decimal(10, 2)
+  availableFrom DateTime
+  roomType      RoomType
+  furnishing    FurnishingType
+  status        ListingStatus  @default(AVAILABLE)
+  photos        String[]       @default([])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  owner               User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  compatibilityScores CompatibilityScore[]
+  interests           Interest[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([location])
+  @@index([rent])
+  @@map("listings")
+}
+
+model CompatibilityScore {
+  id        String   @id @default(uuid())
+  tenantId  String
+  listingId String
+  score     Int
+  breakdown Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  User    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, listingId])
+  @@index([tenantId])
+  @@index([listingId])
+  @@index([score])
+  @@map("compatibility_scores")
+}
+
+enum InterestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model Interest {
+  id        String         @id @default(uuid())
+  tenantId  String
+  listingId String
+  status    InterestStatus @default(PENDING)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  tenant   User      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  listing  Listing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([tenantId, listingId])
+  @@index([tenantId])
+  @@index([listingId])
+  @@index([status])
+  @@map("interests")
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  interestId String
+  senderId   String
+  body       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+  sender   User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([interestId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("messages")
+}
