@@ -8,6 +8,7 @@ import { errorHandler } from './middleware/error.middleware.js';
 import { globalLimiter } from './middleware/rate-limit.middleware.js';
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Disable X-Powered-By to prevent technology fingerprinting
 app.disable('x-powered-by');
